@@ -49,7 +49,7 @@ input[type=checkbox]{width:auto}h3{margin:16px 0 8px}
 .kg{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.kc{background:var(--in);border:1px solid var(--bd);border-radius:14px;padding:12px}
 .kc .en{font-weight:700;font-size:13.5px;direction:ltr;text-align:left}.kc .ar{color:var(--mut);font-size:12.5px;margin:2px 0 8px}.kc .ip{display:flex;gap:8px;align-items:center}.kc .u{font-size:12px;color:var(--mut);white-space:nowrap}.kc input{background:var(--card)}
 details summary{cursor:pointer;font-size:15px}details.card{padding:14px 20px}
-.rs{padding:4px 2px;width:50px;border-radius:8px;text-align:center}.rs.s1{background:#fff0d1}.rs.s2{background:#dbe8ff}.rs.s3{background:#e3e3ea;color:#222}.rs.s4{background:#fde0dd}
+.rs{padding:4px 2px;width:50px;border-radius:8px;text-align:center}.rs.s1{background:#fff0d1}.rs.s2{background:#dbe8ff}.rs.s3{background:#e3e3ea;color:#222}.rs.s4{background:#fde0dd}.rs.s5{background:#ecdcf7;color:#222}
 
 /* تصميم ١: كلاسيك هادئ */
 nav button.on{background:#c7a566;color:#14201f;font-weight:700}nav button:hover{background:#17403f;color:#fff}nav button.on:hover{background:#c7a566;color:#14201f}
@@ -93,6 +93,7 @@ const recs=s=>rows(sb.from("records").select("id,data,created_at").eq("screen",s
 async function addRec(s,o){const r=EDIT?await sb.from("records").update({data:o}).eq("id",EDIT):await sb.from("records").insert({screen:s,data:o});if(r.error){alert("تعذّر الحفظ: "+r.error.message);return false}EDIT=null;return true}
 async function delRec(id){if(!confirm("تأكيد الحذف؟"))return;const r=await sb.from("records").delete().eq("id",id);if(r.error)return alert("تعذّر الحذف");render()}
 const P=s=>(s.usr||s.adm)?isMgmt:true;
+const isOff=s=>s=="إجازة"||s=="إجازة سنوية";
 const fmt=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const myShift=async()=>{const r=await rows(sb.from("roster").select("shift").eq("user_id",me.id).eq("day",today()));return r[0]?r[0].shift:null};
 const visibleTo=(p,ms)=>isMgmt||(((p.assignees||[]).length==0||p.assignees.some(a=>a.id==me.id))&&(!p.shift||!ms||p.shift==ms));
@@ -173,14 +174,14 @@ ${st("أجهزة المعطرات",scd.length+"/2","ورديات تم فحصها
 ${st("إصابات الحشرات اليوم",pid.length,"بلاغات مسجلة اليوم")}
 ${st("الشكاوي المفتوحة",open.length,`جديدة اليوم: ${cmp_.filter(x=>x.date==d).length}`)}
 ${st("KPI اليومي",kv+"/8","موردين تم تقييمهم اليوم",pct(kv,8))}
-${st("الورديات اليوم (مشرفين)",ro.filter(x=>x.shift!="إجازة").length,`صباحي ${ro.filter(x=>x.shift=="صباحي").length} · مسائي ${ro.filter(x=>x.shift=="مسائي").length} · ليلي ${ro.filter(x=>x.shift=="ليلي").length} · إجازة ${ro.filter(x=>x.shift=="إجازة").length}`)}
+${st("الورديات اليوم (مشرفين)",ro.filter(x=>!isOff(x.shift)).length,`صباحي ${ro.filter(x=>x.shift=="صباحي").length} · مسائي ${ro.filter(x=>x.shift=="مسائي").length} · ليلي ${ro.filter(x=>x.shift=="ليلي").length} · إجازة ${ro.filter(x=>isOff(x.shift)).length}`)}
 </div>
 <div class="card" style="padding:0"><div class="tw"><table><thead><tr><th>المجال</th><th>عدد المهام</th><th>تم</th><th>لم يتم</th><th>منتظر</th></tr></thead><tbody>${mods}</tbody></table></div></div>
 ${bad.length?`<div class="card"><h2>مهام لم تُنفذ اليوم</h2>${bad.map(p=>`<p><b>${MOD[p.module]}:</b> ${esc(p.title)} <span style="color:#a5281b">— ${esc(T.L[p.id].reason)}</span> <small>(${esc(T.L[p.id].by_name)})</small></p>`).join("")}</div>`:""}`}
 async function mine(m){const d=today(),d7=fmt(new Date(Date.now()+6*864e5));const [att_,sc,kp,T,ms,ro]=await Promise.all([recs("att"),recs("scent"),rows(sb.from("kpi").select("vendor").eq("day",d)),loadDay(d),myShift(),rows(sb.from("roster").select("day,shift").eq("user_id",me.id).gte("day",d).lte("day",d7).order("day"))]);
 const card=(t,sub,ok,k)=>`<div class="tc ${ok?"d":""}"><div class="row" style="justify-content:space-between"><h4>${t}</h4>${ok?bd("ok","✔ تم"):bd("wt","مطلوب")}</div><p>${sub}</p>${k?`<button class="btn s" onclick="go('${k}')">فتح</button>`:""}</div>`;
 const hero=`<div class="hero"><div style="color:#c7a566;font-size:14px">${DAYS[new Date().getDay()]} · ${d}</div><div style="font-size:28px;font-weight:700;margin:4px 0">أهلاً يا ${esc(me.name)} 👋</div><div style="font-size:17px">النهاردة مطلوب منك</div><div style="margin-top:12px"><span class="bd wt" style="font-size:14px;padding:6px 16px">${ms?"ورديتك: "+esc(ms):"ورديتك اليوم غير محددة"}</span></div></div>`;
-if(ms=="إجازة"){m.innerHTML=hero+'<div class="card em">النهاردة إجازة، مفيش مطلوب منك. يوم سعيد 🌿</div>';return}
+if(isOff(ms)){m.innerHTML=hero+`<div class="card em">النهاردة ${ms=="إجازة سنوية"?"إجازة سنوية":"إجازة"}، مفيش مطلوب منك. يوم سعيد 🌿</div>`;return}
 const mt=T.pl.filter(p=>visibleTo(p,ms)).sort((a,b)=>(a.at_time||"99").localeCompare(b.at_time||"99"));let c=[];
 const ad_=att_.some(x=>x.date==d&&(!ms||x.s==ms));c.push(card("تسجيل الحضور",ad_?"تم تسجيل حضور الوردية":"لم يتم تسجيل الحضور بعد",ad_,"att"));
 mt.forEach(p=>c.push(taskCard(p,T.L[p.id],d,true)));
@@ -243,11 +244,11 @@ const cl=c=>c=="تم"?'<span class="bd ok">تم</span>':c=="لم يتم"?'<span 
 b.innerHTML=`<div class="card"><b>${sum}</b> <span style="color:var(--mut)">(من ${rf} إلى ${rto})</span></div>`+xh+RP.map(t=>`<div class="card" style="padding:0"><div style="padding:14px 20px 0;font-weight:700">${t.t} (${t.rows.length})</div><div class="tw"><table><thead><tr>${t.head.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.length?t.rows.map(r=>`<tr>${r.map(c=>`<td>${cl(c)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${t.head.length}" class="em">لا توجد بيانات في هذه الفترة</td></tr>`}</tbody></table></div></div>`).join("")}
 function csv(){const q=s=>'"'+String(s==null?"":s).replace(/"/g,'""')+'"';const o=RP.map(t=>[q(t.t),t.head.map(q).join(","),...t.rows.map(r=>r.map(q).join(","))].join("\n")).join("\n\n");const u=URL.createObjectURL(new Blob(["\ufeff"+o],{type:"text/csv"}));const a=document.createElement("a");a.href=u;a.download="report-"+rt+"-"+rf+"_"+rto+".csv";a.click()}
 // ---------- توزيع الورديات ----------
-let rm=today().slice(0,7);const RSH=["صباحي","مسائي","ليلي","إجازة"],RSC={"صباحي":"ص","مسائي":"م","ليلي":"ل","إجازة":"إ"};
+let rm=today().slice(0,7);const RSH=["صباحي","مسائي","ليلي","إجازة","إجازة سنوية"],RSC={"صباحي":"ص","مسائي":"م","ليلي":"ل","إجازة":"إ","إجازة سنوية":"س"};
 async function rosterS(m){const[y,mo]=rm.split("-").map(Number),n=new Date(y,mo,0).getDate(),first=rm+"-01",last=rm+"-"+String(n).padStart(2,"0");
 const sup=await rows(sb.from("profiles").select("id,name").eq("role","supervisor").eq("active",true).order("name"));const R={};(await rows(sb.from("roster").select("*").gte("day",first).lte("day",last))).forEach(x=>R[x.user_id+"_"+x.day]=x.shift);
 const days=[...Array(n).keys()].map(i=>i+1);
-m.innerHTML=`<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">توزيع الورديات الشهري</h2><div><input type="month" value="${rm}" onchange="rm=this.value||rm;render()"></div></div><p style="color:var(--mut);margin:8px 0 0">ص = صباحي · م = مسائي · ل = ليلي · إ = إجازة. اختار الوردية لكل يوم، أو استخدم "املأ الشهر". الورديات دي هي اللي بتحدد القوائم والمهام اللي بتظهر للمشرف.</p></div>
+m.innerHTML=`<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">توزيع الورديات الشهري</h2><div><input type="month" value="${rm}" onchange="rm=this.value||rm;render()"></div></div><p style="color:var(--mut);margin:8px 0 0">ص = صباحي · م = مسائي · ل = ليلي · إ = إجازة · س = إجازة سنوية. اختار الوردية لكل يوم، أو استخدم "املأ الشهر". الورديات دي هي اللي بتحدد القوائم والمهام اللي بتظهر للمشرف.</p></div>
 <div class="card" style="padding:0"><div class="tw"><table style="min-width:${200+n*58}px"><thead><tr><th style="min-width:210px">المشرف</th>${days.map(d=>`<th style="text-align:center;padding:8px 4px">${d}<br><small>${DAYS[new Date(y,mo-1,d).getDay()].slice(0,3)}</small></th>`).join("")}</tr></thead><tbody>${sup.length?sup.map(u=>`<tr><td><b>${esc(u.name)}</b><div class="row" style="margin-top:6px;gap:6px"><select id="bf_${u.id}" class="rs" style="width:78px">${RSH.map(x=>`<option>${x}</option>`).join("")}<option value="">مسح</option></select><button class="btn s" onclick="fillR('${u.id}')">املأ الشهر</button></div></td>${days.map(d=>{const day=rm+"-"+String(d).padStart(2,"0"),v=R[u.id+"_"+day]||"";return`<td style="padding:4px"><select class="rs s${RSH.indexOf(v)+1}" onchange="setR('${u.id}','${day}',this)"><option value=""></option>${RSH.map(x=>`<option value="${x}" ${v==x?"selected":""}>${RSC[x]}</option>`).join("")}</select></td>`}).join("")}</tr>`).join(""):`<tr><td colspan="${n+1}" class="em">لا يوجد مشرفين – أضفهم من شاشة المستخدمين</td></tr>`}</tbody></table></div></div>`}
 async function setR(uid,day,el){const v=el.value;el.className="rs s"+(RSH.indexOf(v)+1);const r=v?await sb.from("roster").upsert({user_id:uid,day,shift:v}):await sb.from("roster").delete().eq("user_id",uid).eq("day",day);if(r.error)alert("تعذّر الحفظ: "+r.error.message)}
 async function fillR(uid){const v=$("#bf_"+uid).value,[y,mo]=rm.split("-").map(Number),n=new Date(y,mo,0).getDate();let r;
