@@ -196,6 +196,29 @@ function kpiDraw(m){m=m||$("#main");const it=V[vend];m.innerHTML=`<div class="ca
 function setV(v){vend=v;kpiDraw()}
 function kpiLoad(){const r=(window._k||[]).find(x=>x.id==vend+"_"+kd);V[vend].forEach((x,i)=>{const e=$("#k_"+i);if(e)e.value=r&&r.v&&r.v[i]!=null?r.v[i]:""});if($("#k_n"))$("#k_n").value=r?r.note||"":""}
 async function saveK(){const v=V[vend].map((x,i)=>$("#k_"+i).value===""?null:+$("#k_"+i).value);const r=await sb.from("kpi").upsert({vendor:vend,day:kd,v,note:$("#k_n").value,updated_at:new Date().toISOString()});if(r.error)return alert("تعذّر الحفظ: "+r.error.message);alert("تم الحفظ ✔");kpi($("#main"))}
+const WTARGET=2340;
+function attMonth(AL,to){const mo=to.slice(0,7),y=+mo.slice(0,4),mn=+mo.slice(5,7),dim=new Date(y,mn,0).getDate(),isCur=mo==today().slice(0,7),el=isCur?+today().slice(8):dim;
+const M=AL.filter(x=>x.date.slice(0,7)==mo&&+x.date.slice(8)<=el),W=M.reduce((s,x)=>s+(+x.w||0),0),by={},sh={},dup={};
+M.forEach(x=>{by[x.date]=(by[x.date]||0)+(+x.w||0);sh[x.s]=(sh[x.s]||0)+(+x.w||0);const k=x.date+"|"+x.s;dup[k]=(dup[k]||0)+1});
+const dts=Object.keys(by).sort(),rec=dts.length,req=WTARGET/dim,exp=req*el,avg=rec?W/rec:0,proj=avg*dim,miss=[];for(let d=1;d<=el;d++)if(!by[mo+"-"+String(d).padStart(2,"0")])miss.push(d);
+const dups=Object.values(dup).filter(n=>n>1).length,f=n=>Math.round(n*10)/10,left=dim-el,rem=WTARGET-W,diff=W-exp;
+const ob=[];
+if(!rec)ob.push("لا توجد سجلات حضور في هذا الشهر لحد دلوقتي.");
+else{ob.push(`الفعلي ${W} من ${WTARGET} مطلوب في الشهر (${pct(W,WTARGET)}%).`);
+ob.push(`المعدل المطلوب ${f(req)} عامل يومياً، والمعدل الفعلي ${f(avg)} عامل في اليوم (محسوب على ${rec} يوم متسجل).`);
+ob.push(diff<0?`حتى ${isCur?"النهاردة":"آخر الشهر"} الحضور أقل من المفروض بـ ${f(-diff)} (${pct(W,exp)}% من المطلوب حتى التاريخ ده).`:`حتى ${isCur?"النهاردة":"آخر الشهر"} الحضور أعلى من المفروض بـ ${f(diff)} (${pct(W,exp)}% من المطلوب حتى التاريخ ده).`);
+if(isCur)ob.push(`لو كملت بنفس المعدل هتوصل لحوالي ${Math.round(proj)} في آخر الشهر (${pct(proj,WTARGET)}%)، يعني ${proj>=WTARGET?"أعلى من":"أقل من"} المطلوب بحوالي ${Math.round(Math.abs(WTARGET-proj))}.`);
+else ob.push(`الشهر اتقفل على ${W} (${pct(W,WTARGET)}% من المطلوب)${rem>0?`، والناقص ${rem}`:""}.`);
+if(isCur&&left>0&&rem>0)ob.push(`عشان تحقق المطلوب لازم المتوسط في الـ ${left} يوم الباقيين يبقى حوالي ${f(rem/left)} عامل يومياً.`);
+if(rem<=0)ob.push("تم تحقيق المطلوب الشهري بالكامل.");
+ob.push(`أعلى يوم: ${hi_(by,dts,1)} · أقل يوم: ${hi_(by,dts,0)}.`);
+ob.push("التوزيع حسب الوردية: "+SH.map(x=>`${x} ${sh[x]||0}`).join(" · ")+".")}
+if(miss.length)ob.push(`فيه ${miss.length} يوم ما اتسجلش فيه حضور (${miss.slice(0,10).join("، ")}${miss.length>10?"…":""})، فالأرقام الفعلية ممكن تكون أقل من الواقع.`);
+if(dups)ob.push(`فيه ${dups} حالة تسجيل أكتر من مرة لنفس اليوم والوردية، راجعها لأنها بتزوّد العدد.`);
+const sx=(t,n,s,p)=>`<div class="st"><small>${t}</small><div class="n">${n}</div><div style="color:var(--mut);font-size:13px;margin-bottom:6px">${s}</div>${p==null?"":bar(Math.min(p,100))}</div>`;
+const html=`<div class="card"><h2>مقارنة الحضور بالعدد الشهري – ${mo}</h2><p style="color:var(--mut);margin:0 0 12px">بافتراض إن ${WTARGET} هو إجمالي حضور العمال المطلوب في الشهر (عامل/يوم). ${isCur?`محسوب حتى ${today()} (${el} من ${dim} يوم)`:"شهر كامل"}. الشهر المحسوب هو شهر خانة "إلى تاريخ".</p><div class="stats">${sx("المطلوب الشهري",WTARGET,`${f(req)} عامل يومياً`)}${sx("الفعلي حتى الآن",W,pct(W,WTARGET)+"% من المطلوب",pct(W,WTARGET))}${sx("الفرق عن المعدل",(diff>=0?"+":"-")+f(Math.abs(diff)),`مقابل المطلوب حتى التاريخ ${f(exp)}`)}${sx("المتوقع آخر الشهر",rec?Math.round(proj):"–",rec?pct(proj,WTARGET)+"% من المطلوب":"",rec?pct(proj,WTARGET):null)}</div><h3>الملاحظات</h3><ul style="line-height:2;margin:0;padding-right:20px">${ob.map(x=>`<li>${x}</li>`).join("")}</ul></div>`;
+return{html,rows:[["الشهر",mo],["المطلوب الشهري",WTARGET],["الفعلي",W],["نسبة الإنجاز",pct(W,WTARGET)+"%"],["المطلوب حتى التاريخ",f(exp)],["المتوقع آخر الشهر",rec?Math.round(proj):""],...ob.map(x=>["ملاحظة",x])]}}
+function hi_(by,dts,mx){const d=dts.reduce((a,x)=>(mx?by[x]>by[a]:by[x]<by[a])?x:a,dts[0]);return d+" ("+by[d]+")"}
 const RTYPES=[["att","الحضور"],["mep","التأسيسات"],["marble","جلي وتلميع الرخام"],["facade","الواجهات"],["special","المهام الخاصة"],["scent","أجهزة المعطرات"],["pest","مكافحة الحشرات"],["plants","الزراعة"],["gw","Green Wall"],["cmp","الشكاوي"],["kpi","KPI الموردين"]];
 let rt="att",rf=fmt(new Date(Date.now()-6*864e5)),rto=today(),RP=[];
 async function rep(m){m.innerHTML=`<div class="card"><h2>التقارير</h2><div class="grid"><div><label>الشاشة</label><select id="r_t" onchange="rt=this.value;repBuild()">${RTYPES.map(x=>`<option value="${x[0]}" ${x[0]==rt?"selected":""}>${x[1]}</option>`).join("")}</select></div><div><label>من تاريخ</label><input type="date" id="r_f" value="${rf}" onchange="rf=this.value;repBuild()"></div><div><label>إلى تاريخ</label><input type="date" id="r_e" value="${rto}" onchange="rto=this.value;repBuild()"></div></div>
@@ -204,9 +227,9 @@ function rPre(k){const n=new Date();rto=today();if(k=="m")rf=fmt(new Date(n.getF
 function setR(v){rv=v;repBuild()}
 async function repBuild(){const b=$("#rb");b.innerHTML='<div class="em">جاري التحميل…</div>';$("#r_v").innerHTML=rt=="kpi"?vtabs(rv,"setR"):"";
 if(!rf||!rto||rf>rto){b.innerHTML='<div class="card em">اختار فترة صحيحة (من قبل إلى).</div>';RP=[];return}
-const inR=x=>x.date>=rf&&x.date<=rto,srt=(a,c)=>a.date<c.date?-1:a.date>c.date?1:(a.at||0)-(c.at||0);let sum="";RP=[];
-if(rt=="att"){const r=(await recs("att")).filter(inR).sort(srt),t=k=>r.reduce((s,x)=>s+(+x[k]||0),0);sum=`${r.length} تسجيل · عمال ${t("w")} · سبايدر ${t("sp")} · مشرفين ${t("su")} · أمناء مخازن ${t("k")}`;
-RP.push({t:"سجلات الحضور",head:["التاريخ","الوردية","مدير موقع","إداري موقع","سبايدر","مشرف","عامل","أمين مخزن","ملاحظات","بواسطة"],rows:r.map(x=>[x.date,x.s,x.m,x.a,x.sp||0,x.su,x.w,x.k||0,x.note||"",x.by||""])})}
+const inR=x=>x.date>=rf&&x.date<=rto,srt=(a,c)=>a.date<c.date?-1:a.date>c.date?1:(a.at||0)-(c.at||0);let sum="",xh="";RP=[];
+if(rt=="att"){const AL=await recs("att"),r=AL.filter(inR).sort(srt),t=k=>r.reduce((s,x)=>s+(+x[k]||0),0);sum=`${r.length} تسجيل · عمال ${t("w")} · سبايدر ${t("sp")} · مشرفين ${t("su")} · أمناء مخازن ${t("k")}`;
+RP.push({t:"سجلات الحضور",head:["التاريخ","الوردية","مدير موقع","إداري موقع","سبايدر","مشرف","عامل","أمين مخزن","ملاحظات","بواسطة"],rows:r.map(x=>[x.date,x.s,x.m,x.a,x.sp||0,x.su,x.w,x.k||0,x.note||"",x.by||""])});const M_=attMonth(AL,rto);xh=M_.html;RP.push({t:"مقارنة بالعدد الشهري",head:["البند","القيمة"],rows:M_.rows})}
 else if(MOD[rt]){const plans=await rows(sb.from("plans").select("*").eq("module",rt)),ids=plans.map(p=>p.id),L={};(ids.length?await rows(sb.from("task_logs").select("*").in("plan_id",ids).gte("day",rf).lte("day",rto)):[]).forEach(l=>L[l.plan_id+"_"+l.day]=l);
 const R=[],dt=new Date(rf+"T00:00:00");let dn=0,nd=0,pn=0;for(let dd=fmt(dt);dd<=rto&&dd<=today();dt.setDate(dt.getDate()+1),dd=fmt(dt)){plans.forEach(p=>{if(!applies({...p,active:true},dd))return;const l=L[p.id+"_"+dd],st=l?(l.status=="done"?"تم":"لم يتم"):"منتظر";if(st=="تم")dn++;else if(st=="لم يتم")nd++;else pn++;R.push([dd,p.title,p.at_time?hm(p.at_time):"",p.shift||"الكل",(p.assignees||[]).map(a=>a.name).join("، ")||"كل المشرفين",st,l&&l.reason||"",l&&l.by_name||""])})}
 R.sort((a,c)=>a[0]<c[0]?-1:a[0]>c[0]?1:a[2]<c[2]?-1:1);sum=`${R.length} مهمة · تم ${dn} · لم يتم ${nd} · منتظر ${pn}`;RP.push({t:"المهام",head:["التاريخ","المهمة","الميعاد","الوردية","المُسند","الحالة","السبب","بواسطة"],rows:R});
@@ -217,7 +240,7 @@ else if(rt=="kpi"){const d=(await rows(sb.from("kpi").select("*").eq("vendor",rv
 RP.push({t:"الملخص",head:["Item","البند","القيمة","الحساب"],rows:it.map((x,i)=>{const a=d.map(z=>z.v&&z.v[i]).filter(z=>z!=null);let val="–";if(a.length){const t=a.reduce((p,c)=>p+c,0);val=x[2]=="n"?+t.toFixed(2):+(t/a.length).toFixed(1)}return[x[0],x[1],val,x[2]=="n"?"مجموع":"متوسط"]})});
 RP.push({t:"التفاصيل اليومية",head:["Date",...it.map(x=>x[0])],rows:d.map(z=>[z.day,...it.map((x,i)=>z.v&&z.v[i]!=null?z.v[i]:"")])})}
 const cl=c=>c=="تم"?'<span class="bd ok">تم</span>':c=="لم يتم"?'<span class="bd no">لم يتم</span>':c=="منتظر"?'<span class="bd wt">منتظر</span>':esc(c);
-b.innerHTML=`<div class="card"><b>${sum}</b> <span style="color:var(--mut)">(من ${rf} إلى ${rto})</span></div>`+RP.map(t=>`<div class="card" style="padding:0"><div style="padding:14px 20px 0;font-weight:700">${t.t} (${t.rows.length})</div><div class="tw"><table><thead><tr>${t.head.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.length?t.rows.map(r=>`<tr>${r.map(c=>`<td>${cl(c)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${t.head.length}" class="em">لا توجد بيانات في هذه الفترة</td></tr>`}</tbody></table></div></div>`).join("")}
+b.innerHTML=`<div class="card"><b>${sum}</b> <span style="color:var(--mut)">(من ${rf} إلى ${rto})</span></div>`+xh+RP.map(t=>`<div class="card" style="padding:0"><div style="padding:14px 20px 0;font-weight:700">${t.t} (${t.rows.length})</div><div class="tw"><table><thead><tr>${t.head.map(h=>`<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${t.rows.length?t.rows.map(r=>`<tr>${r.map(c=>`<td>${cl(c)}</td>`).join("")}</tr>`).join(""):`<tr><td colspan="${t.head.length}" class="em">لا توجد بيانات في هذه الفترة</td></tr>`}</tbody></table></div></div>`).join("")}
 function csv(){const q=s=>'"'+String(s==null?"":s).replace(/"/g,'""')+'"';const o=RP.map(t=>[q(t.t),t.head.map(q).join(","),...t.rows.map(r=>r.map(q).join(","))].join("\n")).join("\n\n");const u=URL.createObjectURL(new Blob(["\ufeff"+o],{type:"text/csv"}));const a=document.createElement("a");a.href=u;a.download="report-"+rt+"-"+rf+"_"+rto+".csv";a.click()}
 // ---------- توزيع الورديات ----------
 let rm=today().slice(0,7);const RSH=["صباحي","مسائي","ليلي","إجازة"],RSC={"صباحي":"ص","مسائي":"م","ليلي":"ل","إجازة":"إ"};
